@@ -3,7 +3,7 @@ import { Box } from "..";
 
 export default function Header() {
   return (
-    <Box className=" inset-x-0 top-0 z-50">
+    <Box className="sm:absolute inset-x-0 top-0 z-50">
       <Box
         className="flex items-center justify-between p-6 lg:px-8"
         aria-label="Global"
