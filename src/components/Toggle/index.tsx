@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, ReactNode } from "react";
+import { InputHTMLAttributes } from "react";
 
 interface IToggle extends InputHTMLAttributes<HTMLSelectElement> {
   checked?: boolean;

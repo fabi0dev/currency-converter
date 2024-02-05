@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Header, Input, Select, Toggle } from "../../components";
 import currencyAPI from "../../services/currencyAPI";
 import localforage from "localforage";
@@ -12,6 +12,7 @@ import { selectorLatest, setLatest } from "../../store/reducers/latest";
 import PolygonsUI from "./polygonsUI";
 
 import * as Icon from "@heroicons/react/24/outline";
+import { selectorCurrency, setCurrency } from "../../store/reducers/currency";
 
 interface IValueConvert {
   from?: number;
@@ -20,6 +21,7 @@ interface IValueConvert {
 
 export default function Home() {
   const dispatch = useDispatch();
+  const currency = useSelector(selectorCurrency);
   const currencySelect = useSelector(selectorCurrencySelect);
   const latest = useSelector(selectorLatest);
 
@@ -41,19 +43,15 @@ export default function Home() {
     to: 0,
   });
 
-  const [dataCurrency, setDataCurrency] = useState({
-    data: {},
-  });
-
   const getCurrencies = async () => {
-    const localCurrencies = await localforage.getItem("_CURRENCIES");
-
-    if (localCurrencies == null) {
+    if (typeof currency.data.BRL === "undefined") {
       const data = await currencyAPI.getCurrencies();
-      localforage.setItem("_CURRENCIES", data);
-      setDataCurrency(data as never);
-    } else {
-      setDataCurrency(localCurrencies);
+
+      dispatch(
+        setCurrency({
+          data: data.data,
+        })
+      );
     }
   };
 
@@ -172,7 +170,7 @@ export default function Home() {
 
   return (
     <>
-      <Box className="w-full h-screen flex-1 bg-slate-800">
+      <Box className="w-full h-screen flex-1 bg-slate-900">
         <Header />
 
         <Box className="relative isolate px-6 pt-14 lg:px-8">
@@ -216,6 +214,7 @@ export default function Home() {
                 <Box className="grid grid-cols-[30%_auto] gap-2">
                   <Box>
                     <Input
+                      autoFocus
                       name="valueFrom"
                       placeholder="0,00"
                       className="text-right"
@@ -234,7 +233,7 @@ export default function Home() {
                         getLatest(value, (latestData) => {
                           dispatch(
                             setCurrencyFromSelect({
-                              ...dataCurrency.data[value],
+                              ...currency.data[value],
                               value: latestData[value].value,
                             })
                           );
@@ -248,7 +247,7 @@ export default function Home() {
                           Selecione uma opção
                         </option>
                       )}
-                      {Object.entries(dataCurrency.data).map(
+                      {Object.entries(currency.data).map(
                         ([name, currency], index) => {
                           if (
                             mainCurrencies.indexOf(name) == -1 &&
@@ -292,7 +291,7 @@ export default function Home() {
 
                         dispatch(
                           setCurrencyToSelect({
-                            ...dataCurrency.data[value],
+                            ...currency.data[value],
                             value: latest.data[value].value,
                           })
                         );
@@ -307,7 +306,7 @@ export default function Home() {
                           Selecione uma opção
                         </option>
                       )}
-                      {Object.entries(dataCurrency.data).map(
+                      {Object.entries(currency.data).map(
                         ([name, currency], index) => {
                           if (
                             mainCurrencies.indexOf(name) == -1 &&
@@ -333,11 +332,22 @@ export default function Home() {
                     checked={isMainCurrencies ? true : false}
                     onChange={() => setIsMainCurrencies(!isMainCurrencies)}
                     label="Principais moedas"
+                    name="mainCurrency"
                   />
                 </Box>
               </Box>
 
-              <Box className="fixed bottom-3 right-3 text-center mt-8 text-xs text-stone-200">
+              <Box className="fixed bottom-3 right-3 text-center mt-8 text-xs text-stone-200 ">
+                <Box className="mb-2">
+                  Develop: by{" "}
+                  <a
+                    href="https://www.linkedin.com/in/fabio-alv3s/"
+                    target="_blank"
+                    className="text-blue-300 underline"
+                  >
+                    Fábio A.
+                  </a>
+                </Box>
                 API Requests: {statusAPI.quotas.month.used}/
                 {statusAPI.quotas.month.total}
               </Box>

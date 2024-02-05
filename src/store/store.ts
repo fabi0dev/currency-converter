@@ -1,5 +1,6 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import latest from "./reducers/latest";
+import currency from "./reducers/currency";
 import currencySelect from "./reducers/currencySelect";
 import localforage from "localforage";
 import { persistReducer, persistStore } from "redux-persist";
@@ -7,12 +8,13 @@ import { persistReducer, persistStore } from "redux-persist";
 const currencyPersistConfig = {
   key: "latest",
   storage: localforage,
-  safelist: ["latest", "currencySelect"],
+  safelist: ["latest", "currency", "currencySelect"],
 };
 
 const all = combineReducers({
   latest,
   currencySelect,
+  currency,
 });
 
 const reducers = persistReducer(currencyPersistConfig, all);
