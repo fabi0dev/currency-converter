@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, Header, Input, Select, Toggle } from "../../components";
 import currencyAPI from "../../services/currencyAPI";
-import localforage from "localforage";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectorCurrencySelect,
@@ -43,7 +42,7 @@ export default function Home() {
     to: 0,
   });
 
-  const getCurrencies = async () => {
+  const getCurrencies = useCallback(async () => {
     if (typeof currency.data.BRL === "undefined") {
       const data = await currencyAPI.getCurrencies();
 
@@ -53,7 +52,7 @@ export default function Home() {
         })
       );
     }
-  };
+  }, []);
 
   const getLatest = useCallback(
     async (baseCurrency: string, fn: (data: any) => void) => {
@@ -162,7 +161,7 @@ export default function Home() {
 
   useEffect(() => {
     getCurrencies();
-  }, []);
+  }, [getCurrencies]);
 
   useEffect(() => {
     getStatus();
@@ -248,7 +247,7 @@ export default function Home() {
                         </option>
                       )}
                       {Object.entries(currency.data).map(
-                        ([name, currency], index) => {
+                        ([name, { name_plural }], index) => {
                           if (
                             mainCurrencies.indexOf(name) == -1 &&
                             isMainCurrencies
@@ -257,7 +256,7 @@ export default function Home() {
                           }
                           return (
                             <option key={index} value={name}>
-                              {name} {currency.name_plural}
+                              {name} {name_plural}
                             </option>
                           );
                         }
@@ -307,7 +306,7 @@ export default function Home() {
                         </option>
                       )}
                       {Object.entries(currency.data).map(
-                        ([name, currency], index) => {
+                        ([name, { name_plural }], index) => {
                           if (
                             mainCurrencies.indexOf(name) == -1 &&
                             isMainCurrencies
@@ -316,7 +315,7 @@ export default function Home() {
                           }
                           return (
                             <option key={index} value={name}>
-                              {name} {currency.name_plural}
+                              {name} {name_plural}
                             </option>
                           );
                         }
