@@ -1,14 +1,17 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+interface ILatest {
+  data: [];
+}
 const initialState = {
-  value: 0,
+  data: {},
 };
 
-export const latestSlice = createSlice({
+export const slice = createSlice({
   name: "latest",
   initialState,
   reducers: {
-    setDataLatest: (state, { payload }) => {
+    setLatest: (state, { payload }) => {
       return {
         ...state,
         ...payload,
@@ -17,5 +20,6 @@ export const latestSlice = createSlice({
   },
 });
 
-export const { setDataLatest } = latestSlice.actions;
-export default latestSlice.reducer;
+export const { setLatest } = slice.actions;
+export default slice.reducer;
+export const selectorLatest = (state: { latest: ILatest }) => state.latest;

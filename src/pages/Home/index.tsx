@@ -1,7 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, Header, Input, Select, Toggle } from "../../components";
 import currencyAPI from "../../services/currencyAPI";
 import localforage from "localforage";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  selectorCurrencySelect,
+  setCurrencyFromSelect,
+  setCurrencyToSelect,
+} from "../../store/reducers/currencySelect";
+import { selectorLatest, setLatest } from "../../store/reducers/latest";
+import PolygonsUI from "./polygonsUI";
+
+import * as Icon from "@heroicons/react/24/outline";
 
 interface IValueConvert {
   from?: number;
@@ -9,8 +19,13 @@ interface IValueConvert {
 }
 
 export default function Home() {
+  const dispatch = useDispatch();
+  const currencySelect = useSelector(selectorCurrencySelect);
+  const latest = useSelector(selectorLatest);
+
   const mainCurrencies = ["BRL", "USD", "AUD", "EUR", "CAD"];
   const [isMainCurrencies, setIsMainCurrencies] = useState(true);
+
   const [statusAPI, setStatusAPI] = useState({
     quotas: {
       month: {
@@ -20,6 +35,7 @@ export default function Home() {
       },
     },
   });
+
   const [valueConvert, setValueConvert] = useState<IValueConvert>({
     from: 0,
     to: 0,
@@ -27,22 +43,6 @@ export default function Home() {
 
   const [dataCurrency, setDataCurrency] = useState({
     data: {},
-  });
-
-  const [dataLatest, setDataLatest] = useState({
-    data: {},
-  });
-
-  const initialCurrency = {
-    name: "",
-    name_plural: "",
-    symbol: "",
-    value: 0,
-  };
-
-  const [currencySelected, setCurrencySelected] = useState({
-    from: initialCurrency,
-    to: initialCurrency,
   });
 
   const getCurrencies = async () => {
@@ -57,61 +57,118 @@ export default function Home() {
     }
   };
 
-  const getLatest = async () => {
-    const localLatest = await localforage.getItem("_LATEST");
+  const getLatest = useCallback(
+    async (baseCurrency: string, fn: (data: any) => void) => {
+      const dataLatest = await currencyAPI.getLatest(baseCurrency);
+      const data = dataLatest.data;
 
-    if (localLatest == null) {
-      const data = await currencyAPI.getLatest();
-      localforage.setItem("_LATEST", data);
-      setDataLatest(data as never);
-    } else {
-      setDataLatest(localLatest);
-    }
-  };
+      dispatch(
+        setLatest({
+          data,
+        })
+      );
+
+      fn(data);
+    },
+    [dispatch]
+  );
 
   const getStatus = async () => {
     const data = await currencyAPI.getStatus();
     setStatusAPI(data);
   };
 
-  const convertNumber = (value) => {
-    return value ? parseFloat(value.replace(/,/g, ".")) : 0;
+  const convertNumber = (value: string) => {
+    if (typeof value == "string") {
+      return value ? parseFloat(value.replace(/,/g, ".")) : 0;
+    }
+
+    return value;
   };
 
-  const calculateFrom = (value) => {
+  const calculateFrom = (value: string) => {
     const to = valueConvert.to || 1;
+
     const valueTo = parseFloat(
-      (
-        convertNumber(value) * (to > 0 ? currencySelected.from.value : 0)
-      ).toFixed(2)
+      (convertNumber(value) * (to > 0 ? currencySelect.to.value : 0)).toFixed(2)
     );
 
     setValueConvert({
+      from: value,
       to: valueTo > 0 ? valueTo : 0,
     });
   };
 
-  const calculateTo = (value) => {
+  const calculateTo = (value: string) => {
     const from = valueConvert.from || 1;
-    const valueFrom = parseFloat(
-      (
-        convertNumber(value) * (from > 0 ? currencySelected.from.value : 0)
-      ).toFixed(2)
-    );
+    let valueFrom = 0;
+
+    if (currencySelect.to.value < 1) {
+      const valueUn = 100 / (currencySelect.to.value * 100);
+      valueFrom = parseFloat((convertNumber(value) * valueUn).toFixed(2));
+    } else {
+      if (currencySelect.to.value > currencySelect.from.value) {
+        const valueUn = 100 / (currencySelect.to.value * 100);
+        valueFrom = parseFloat((convertNumber(value) * valueUn).toFixed(2));
+      } else {
+        valueFrom = parseFloat(
+          (
+            convertNumber(value) * (from > 0 ? currencySelect.to.value : 0)
+          ).toFixed(2)
+        );
+      }
+    }
 
     setValueConvert({
+      to: value,
       from: valueFrom > 0 ? valueFrom : 0,
     });
   };
 
+  const updateValueTo = (value: string) => {
+    const valueFrom = valueConvert.from || 1;
+
+    const valueTo = parseFloat(
+      (convertNumber(value) * (valueFrom > 0 ? valueFrom : 0)).toFixed(2)
+    );
+
+    setValueConvert({
+      ...valueConvert,
+      to: valueTo > 0 ? valueTo : 0,
+    });
+  };
+
+  const getComparePercent = () => {
+    let percent = "0";
+    let negative = false;
+
+    if (currencySelect.from.value > currencySelect.to.value) {
+      const calc =
+        100 - (currencySelect.to.value * 100) / currencySelect.from.value;
+      percent = `${calc.toFixed(2)}%`;
+      negative = true;
+    } else {
+      const calc = (currencySelect.to.value * 100) / currencySelect.from.value;
+      percent = `${calc.toFixed(2)}%`;
+    }
+
+    if (percent == "100.00%") {
+      percent = "";
+    }
+
+    return {
+      percent,
+      negative,
+    };
+  };
+
   useEffect(() => {
     getCurrencies();
-    getLatest();
   }, []);
 
   useEffect(() => {
     getStatus();
-  }, []);
+  }, [currencySelect]);
 
   return (
     <>
@@ -119,31 +176,38 @@ export default function Home() {
         <Header />
 
         <Box className="relative isolate px-6 pt-14 lg:px-8">
-          <Box
-            className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-            aria-hidden="true"
-          >
-            <Box
-              className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[red] to-[blue] opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-              style={{
-                clipPath:
-                  "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-              }}
-            />
-          </Box>
+          <PolygonsUI />
 
           <Box className="mx-auto max-w-2xl sm:py-48 lg:py-56">
             <Box>
-              {currencySelected.from.name && currencySelected.to.name && (
+              {currencySelect.from.name && currencySelect.to.name && (
                 <Box>
                   <Box>
-                    {currencySelected.from.symbol} 1{" "}
-                    {currencySelected.from.name} é igual a
+                    {currencySelect.from.symbol} 1 {currencySelect.from.name} é
+                    igual a
                   </Box>
-                  <Box className="text-5xl">
-                    {currencySelected.to.symbol}{" "}
-                    {currencySelected.from.value.toFixed(2)}{" "}
-                    {currencySelected.to.name_plural}
+                  <Box className="text-5xl flex">
+                    {currencySelect.to.symbol}{" "}
+                    {currencySelect.to.value.toFixed(2)}{" "}
+                    {currencySelect.to.name_plural}
+                    <Box className="flex">
+                      {!getComparePercent().negative && (
+                        <Icon.ArrowUpIcon
+                          className="h-6 w-6 text-red-500"
+                          stroke="#4caf50"
+                        />
+                      )}
+
+                      {getComparePercent().negative && (
+                        <Icon.ArrowDownIcon
+                          className="h-6 w-6 text-red-500"
+                          stroke="#f44336"
+                        />
+                      )}
+                      <Box className="text-xs">
+                        {getComparePercent().percent}
+                      </Box>
+                    </Box>
                   </Box>
                 </Box>
               )}
@@ -157,36 +221,33 @@ export default function Home() {
                       className="text-right"
                       value={valueConvert.from}
                       onValueChange={(value) => {
-                        setValueConvert({
-                          ...valueConvert,
-                          from: value as string,
-                        });
-                        calculateFrom(value);
+                        calculateFrom(value as string);
                       }}
+                      autoComplete={"off"}
                     />
                   </Box>
                   <Box>
                     <Select
                       onChange={(event) => {
                         const value = event.target.value;
-                        if (value !== "") {
-                          setCurrencySelected({
-                            ...currencySelected,
-                            from: {
+
+                        getLatest(value, (latestData) => {
+                          dispatch(
+                            setCurrencyFromSelect({
                               ...dataCurrency.data[value],
-                              value: dataLatest.data[value].value,
-                            },
-                          });
-                        } else {
-                          setCurrencySelected({
-                            ...currencySelected,
-                            from: initialCurrency,
-                          });
-                        }
+                              value: latestData[value].value,
+                            })
+                          );
+                        });
                       }}
                       name="currencyFrom"
-                      defaultValue={""}
+                      value={currencySelect.from.code}
                     >
+                      {currencySelect.from.code == "" && (
+                        <option key={9999999} value={""}>
+                          Selecione uma opção
+                        </option>
+                      )}
                       {Object.entries(dataCurrency.data).map(
                         ([name, currency], index) => {
                           if (
@@ -214,40 +275,38 @@ export default function Home() {
                   <Box>
                     <Input
                       name="valueTo"
-                      placeholder={`${currencySelected.to.symbol} 0,00`}
+                      placeholder={`${currencySelect.to.symbol} 0,00`}
                       className="text-right"
                       value={valueConvert.to}
                       onValueChange={(value) => {
-                        setValueConvert({
-                          ...valueConvert,
-                          to: value as string,
-                        });
-                        calculateTo(value);
+                        calculateTo(value as string);
                       }}
+                      disabled={currencySelect.to.code == "" ? true : false}
+                      autoComplete={"off"}
                     />
                   </Box>
                   <Box>
                     <Select
-                      name="currencyTo"
-                      defaultValue={""}
                       onChange={(event) => {
                         const value = event.target.value;
-                        if (value !== "") {
-                          setCurrencySelected({
-                            ...currencySelected,
-                            to: {
-                              ...dataCurrency.data[value],
-                              value: dataLatest.data[value].value,
-                            },
-                          });
-                        } else {
-                          setCurrencySelected({
-                            ...currencySelected,
-                            to: initialCurrency,
-                          });
-                        }
+
+                        dispatch(
+                          setCurrencyToSelect({
+                            ...dataCurrency.data[value],
+                            value: latest.data[value].value,
+                          })
+                        );
+
+                        updateValueTo(latest.data[value].value);
                       }}
+                      name="currencyTo"
+                      value={currencySelect.to.code}
                     >
+                      {currencySelect.to.code == "" && (
+                        <option key={9999999} value={""}>
+                          Selecione uma opção
+                        </option>
+                      )}
                       {Object.entries(dataCurrency.data).map(
                         ([name, currency], index) => {
                           if (
@@ -278,7 +337,7 @@ export default function Home() {
                 </Box>
               </Box>
 
-              <Box className="text-center mt-8 text-xs text-stone-100">
+              <Box className="fixed bottom-3 right-3 text-center mt-8 text-xs text-stone-200">
                 API Requests: {statusAPI.quotas.month.used}/
                 {statusAPI.quotas.month.total}
               </Box>
