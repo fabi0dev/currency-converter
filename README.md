@@ -14,7 +14,7 @@ Aplicação para converter moedas, feita com React.js,Vite e TailwindCSS. Fiz in
    <br />
 2. Instale as dependências: `npm install`
    <br />
-3. Inicie a aplicação: `npm start` ou `yarn start`
+3. Inicie a aplicação: `npm dev` ou `yarn dev`
 
 <br />
 <b>Utilizando Sabiamente a API:</b> 
